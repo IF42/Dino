@@ -1,136 +1,233 @@
+# zavedení knivhony raylib do programu
 from pyray import *
-from math import floor
+from math import sqrt, floor
+from enum import Enum
+
+WIN_WIDTH = 800
+WIN_HEIGHT = 600
 
 
-WIN_WIDTH=800
-WIN_HEIGHT=600
+class GameState_ID(Enum):
+    INIT = 0
+    RUNNING = 1
+    GAMEOVER = 2
 
 
-class SceneTexture:
-    def __init__(self, texture, init_vel, x, y, width):
-        self.acc = 5
-        self.vel = init_vel
-        self.texture = texture
-        self.source = Rectangle(0, 0, texture.width, texture.height)
-        self.dest = Rectangle(x, y, width, texture.height)
+class GameContext:
+    def __init__(self):
+        self.state = GameState_ID.INIT
+        self.road_x = 0
+        self.cloud_x = 0
+        self.dino = Vector2(150, 450)
+        self.cactus = Vector2(700, 440)
+        self.floor_y = 450
+        self.score = 0
 
-    def update(self, frame_time):
-        self.source.x += self.vel * frame_time
-        self.vel += self.acc * frame_time
-        draw_texture_pro(self.texture, self.source, self.dest, Vector2(0, 0), 0, WHITE)
+# deklarace (vytvoření) třídy
+class GameState:
+    def draw(self, contex, frame_time):
+        pass
 
-class Player:
-    def __init__(self, texture_dead, texture_run1, texture_run2, texture_duck1, texture_duck2, x, y):
+
+class GameState_Init(GameState): 
+    def __init__(self, road_texture, cloud_texture, dino_texture):
+        self.road_texture = road_texture
+        self.dino_texture = dino_texture
+        self.cloud_texture = cloud_texture
+
+    def _handle_input(self, context):
+        # reakce na stisk klávsy shift, která iniciuje změnu herního stavu
+        if is_key_pressed(KEY_SPACE):
+            context.state = GameState_ID.RUNNING
+
+    def draw(self, context, frame_time):
+        self._handle_input(context)
+        
+        draw_texture_pro(
+            self.cloud_texture
+            , Rectangle(0, 0, WIN_WIDTH, self.cloud_texture.height)  # čtverec výřezu obrázku
+            , Rectangle(0, 200, WIN_WIDTH, self.cloud_texture.height)     # pozice a velikost v okně programu
+            , Vector2(0, 0)                                         # posun počátečního bodu vykreslení
+            , 0                                                     # úhel natočení obrázku
+            , WHITE                                                 # barva pozadí
+        )
+        draw_texture_pro(
+            self.road_texture
+            , Rectangle(0, 0, WIN_WIDTH, self.road_texture.height)  # čtverec výřezu obrázku
+            , Rectangle(0, 500, WIN_WIDTH, self.road_texture.height)     # pozice a velikost v okně programu
+            , Vector2(0, 0)                                         # posun počátečního bodu vykreslení
+            , 0                                                     # úhel natočení obrázku
+            , WHITE                                                 # barva pozadí
+        )
+        draw_texture_ex(self.dino_texture, context.dino, 0, 1, WHITE)
+        draw_text("Press space", 250, 100, 50, GRAY)
+
+
+class GameState_Running(GameState): 
+    def __init__(self, road_texture, cloud_texture, cactus_texture, dino_texture_list):
+        self.road_texture = road_texture
+        self.dino_texture_list = dino_texture_list
+        self.cloud_texture = cloud_texture
+        self.cactus_texture = cactus_texture
         self.timer = 0
-        self.state = 0
-
-        self.pos = Vector2(x, y)
+        self.pose = 0
         self.acc = 0
         self.vel = 0
-        self.floor_pos = y
-        self.texture_list = [texture_run1, texture_run2, texture_duck1, texture_duck2, texture_dead]
-
-    def jump(self):
-        if self.acc == 0:
-            self.vel = -700
-
-    def duck(self, cmd):
-        if cmd is True:
-            self.state = 2
-        else:
-            self.state = 0
-
-    def update(self, frame_time):
-        self.vel += self.acc
-        self.pos.y += (self.vel * frame_time)
-
-        if self.pos.y < self.floor_pos:
-            if self.acc < 35:
-                self.acc += 3
-        else:
-            self.pos.y = self.floor_pos
-            self.acc = 0
-            self.vel = 0
-        
-        self.timer = (self.timer + (frame_time * 4)) % 2
-        texture_index = floor(self.timer) + self.state
-
-        draw_texture_ex(self.texture_list[texture_index], self.pos, 0, 1, WHITE)
-
-class Cactus:
-    def __init__(self, texture, x, y):
-        self.pos = Vector2(x, y)
-        self.texture = texture
-
-    def update(self, time_frame, vel):
-        if self.pos.x <= 0:
-            self.pos.x = 800
-        else:
-            self.pos.x -= vel * time_frame * 0.89
-
-        draw_texture_ex(self.texture, self.pos, 0, 1, WHITE)
 
 
-if __name__ == "__main__":
-    set_config_flags(FLAG_VSYNC_HINT)
-    init_window(WIN_WIDTH, WIN_HEIGHT, "Dino")
-    set_target_fps(144)
-
-    road_texture = load_texture("graphics/road_template.png")
-    cloud_texture = load_texture("graphics/cloud_template.png")
-    dino_dead_texture = load_texture("graphics/dino1.png")
-    dino_run1_texture = load_texture("graphics/dino2.png")
-    dino_run2_texture = load_texture("graphics/dino3.png")
-    dino_duck1_texture = load_texture("graphics/dino4.png")
-    dino_duck2_texture = load_texture("graphics/dino5.png")
-    cactus_texture = load_texture("graphics/cactus.png")
-
-    road = SceneTexture(road_texture, 200, 0, 500, WIN_WIDTH)
-    cloud = SceneTexture(cloud_texture, 100, 0, 300, WIN_WIDTH)
-    player = Player(dino_dead_texture, dino_run1_texture, dino_run2_texture, dino_duck1_texture, dino_duck2_texture, 150, 450)
-    cactus = Cactus(cactus_texture, 700, 450)
-
-    while window_should_close() is False:
-        frame_time = get_frame_time()
-        if road.vel > 500:
-            road.acc = -5
-            cloud.acc = -5
-        elif road.vel < 200:
-            road.acc = 5
-            cloud.acc = 5 
-
+    def _handle_input(self, context):
+        # reakce na stisk klávsy shift, která iniciuje změnu herního stavu
         if is_key_pressed(KEY_UP):
-            player.jump()
-        elif is_key_pressed(KEY_DOWN):
-            player.duck(True)
-        elif is_key_released(KEY_DOWN):
-            player.duck(False)
+            self._jump()
+        elif is_key_down(KEY_DOWN):
+            self.pose = 2
+        else:
+            self.pose = 0
 
-    
-        if (cactus.pos.x - player.pos.x) < 20*(road.vel*frame_time) and cactus.pos.x > player.pos.x:
-            player.jump()
+    def _jump(self):
+        if self.vel == 0:
+            self.vel = -1000
 
+    def _dino_texture(self):
+        return self.dino_texture_list[floor(self.timer) + self.pose]
 
-        begin_drawing()
-        clear_background(WHITE)
-        draw_fps(10, 10)
+    def draw(self, context, frame_time):
+        self._handle_input(context)
+        self.timer = (self.timer + (frame_time * 4)) % 2
 
-        road.update(frame_time)
-        cactus.update(frame_time, road.vel)
-        cloud.update(frame_time)
-        player.update(frame_time)
+        self.vel += self.acc * frame_time
+        context.dino.y += self.vel * frame_time
 
-        end_drawing()
+        if context.dino.y < context.floor_y:
+            self.acc += 10000*frame_time
+        else:
+            context.dino.y = context.floor_y 
+            self.vel = 0
+            self.acc = 0
+        
+        context.road_x = (context.road_x + (300 * frame_time)) % self.road_texture.width
+        context.cloud_x = (context.cloud_x + (150 * frame_time)) % self.cloud_texture.width
 
-    unload_texture(road_texture)
-    unload_texture(cloud_texture)
-    unload_texture(dino_dead_texture)
-    unload_texture(dino_run1_texture)
-    unload_texture(dino_run2_texture)
-    unload_texture(dino_duck1_texture)
-    unload_texture(dino_duck2_texture)
-    unload_texture(cactus_texture)
+        if context.cactus.x > 0:
+            context.cactus.x = (context.cactus.x - (300 * frame_time * 0.98))
+        else:
+            context.score += 1
+            context.cactus.x = WIN_WIDTH
+        
+        distance = sqrt((context.dino.x - context.cactus.x)**2 + (context.dino.y - context.cactus.y)**2)
+        if distance < (self._dino_texture().width + self.cactus_texture.width) / 2 and context.dino.x < context.cactus.x:
+            context.state = GameState_ID.GAMEOVER
+        elif distance < (self._dino_texture().width + self.cactus_texture.width) and context.dino.x < context.cactus.x:
+            self._jump()
+             
+        draw_texture_pro(
+            self.cloud_texture
+            , Rectangle(context.cloud_x, 0, WIN_WIDTH, self.cloud_texture.height)  # čtverec výřezu obrázku
+            , Rectangle(0, 200, WIN_WIDTH, self.cloud_texture.height)     # pozice a velikost v okně programu
+            , Vector2(0, 0)                                         # posun počátečního bodu vykreslení
+            , 0                                                     # úhel natočení obrázku
+            , WHITE                                                 # barva pozadí
+        )
+        draw_texture_pro(
+            self.road_texture
+            , Rectangle(context.road_x, 0, WIN_WIDTH, self.road_texture.height)  # čtverec výřezu obrázku
+            , Rectangle(0, 500, WIN_WIDTH, self.road_texture.height)     # pozice a velikost v okně programu
+            , Vector2(0, 0)                                         # posun počátečního bodu vykreslení
+            , 0                                                     # úhel natočení obrázku
+            , WHITE                                                 # barva pozadí
+        )
+        
+        draw_texture_ex(self._dino_texture(), context.dino, 0, 1, WHITE)
+        draw_texture_ex(self.cactus_texture, context.cactus, 0, 1, WHITE)
+        draw_text(f"Score: {context.score}", 600, 50, 30, GRAY)
 
-    close_window()
+class GameState_GameOver(GameState): 
+    def __init__(self, road_texture, cloud_texture, cactus_texture, dino_texture):
+        self.road_texture = road_texture
+        self.cactus_texture = cactus_texture
+        self.dino_texture = dino_texture
+        self.cloud_texture = cloud_texture
 
+    def _handle_input(self, context):
+        # reakce na stisk klávsy shift, která iniciuje změnu herního stavu
+        if is_key_pressed(KEY_SPACE):
+            context.cactus.x = 700
+            context.road_x = 0
+            context.cloud_x = 0 
+            context.state = GameState_ID.RUNNING
+            context.score = 0
 
+    def draw(self, context, frame_time):
+        self._handle_input(context)
+        
+        draw_texture_pro(
+            self.cloud_texture
+            , Rectangle(context.cloud_x, 0, WIN_WIDTH, self.cloud_texture.height)  # čtverec výřezu obrázku
+            , Rectangle(0, 200, WIN_WIDTH, self.cloud_texture.height)     # pozice a velikost v okně programu
+            , Vector2(0, 0)                                         # posun počátečního bodu vykreslení
+            , 0                                                     # úhel natočení obrázku
+            , WHITE                                                 # barva pozadí
+        )
+        draw_texture_pro(
+            self.road_texture
+            , Rectangle(context.road_x, 0, WIN_WIDTH, self.road_texture.height)  # čtverec výřezu obrázku
+            , Rectangle(0, 500, WIN_WIDTH, self.road_texture.height)     # pozice a velikost v okně programu
+            , Vector2(0, 0)                                         # posun počátečního bodu vykreslení
+            , 0                                                     # úhel natočení obrázku
+            , WHITE                                                 # barva pozadí
+        )
+        draw_texture_ex(self.dino_texture, context.dino, 0, 1, WHITE)
+        draw_texture_ex(self.cactus_texture, context.cactus, 0, 1, WHITE)
+        draw_text(f"Score: {context.score}", 600, 50, 30, GRAY)
+        draw_text("Game Over", 250, 100, 50, GRAY)
+
+# inicializace grafického okna
+set_config_flags(FLAG_VSYNC_HINT)
+init_window(WIN_WIDTH, WIN_HEIGHT, "Dino")
+set_target_fps(144)
+
+# načtení grafických textur do programu
+road_texture = load_texture("graphics/road_template.png")
+cloud_texture = load_texture("graphics/cloud_template.png")
+
+cactus_texture = load_texture("graphics/cactus.png")
+
+dino1_texture = load_texture("graphics/dino1.png")
+dino2_texture = load_texture("graphics/dino2.png")
+dino3_texture = load_texture("graphics/dino3.png")
+dino4_texture = load_texture("graphics/dino4.png")
+dino5_texture = load_texture("graphics/dino5.png")
+
+game_context = GameContext()
+strategy = [
+    GameState_Init(road_texture, cloud_texture, dino2_texture)
+    , GameState_Running(
+        road_texture
+        , cloud_texture
+        , cactus_texture
+        , [dino2_texture, dino3_texture, dino4_texture, dino5_texture]
+        )
+    , GameState_GameOver(road_texture, cloud_texture, cactus_texture, dino1_texture)
+]
+
+# herní smyčka
+while window_should_close() is False:
+    frame_time = get_frame_time()
+
+    begin_drawing()
+
+    # vykreslení stavu hry
+    clear_background(WHITE)
+    draw_fps(10, 10)
+    strategy[game_context.state.value].draw(game_context, frame_time)
+    end_drawing()
+
+# korektní ukončení programu a uvolění zdrojů
+unload_texture(road_texture)
+unload_texture(dino1_texture)
+unload_texture(dino2_texture)
+unload_texture(dino3_texture)
+unload_texture(dino4_texture)
+unload_texture(dino5_texture)
+unload_texture(cactus_texture)
+close_window()
